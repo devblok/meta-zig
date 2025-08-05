@@ -2,7 +2,7 @@ SUMMARY = "Zig programming language compiler - native"
 DESCRIPTION = "Zig is a general-purpose programming language and toolchain for maintaining robust, optimal, and reusable software."
 HOMEPAGE = "https://ziglang.org/"
 LICENSE = "MIT"
-LIC_FILES_CHKSUM = "file://LICENSE;md5=86d3f3a95c324c9479bd8986968f4327"
+LIC_FILES_CHKSUM = "file://LICENSE;md5=d934d7758eb646c9c6a2162d88427689"
 
 DEPENDS = "clang-native cmake-native ninja-native python3-native zlib-native zstd-native"
 
