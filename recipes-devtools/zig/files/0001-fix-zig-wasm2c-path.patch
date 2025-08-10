@@ -1,0 +1,31 @@
+From: Claude Code <noreply@anthropic.com>
+Date: Thu, 8 Aug 2025 20:45:27 +0000
+Subject: [PATCH] Fix zig-wasm2c path in CMake build
+
+The zig-wasm2c utility is built as a target but the custom command
+tries to execute it from PATH instead of using the built binary.
+This causes "command not found" errors during build.
+
+Use CMake's TARGET_FILE generator expression to get the full path
+to the built zig-wasm2c executable.
+
+Signed-off-by: Claude Code <noreply@anthropic.com>
+---
+ CMakeLists.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 1234567..abcdefg 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -839,7 +839,7 @@ set_target_properties(zig-wasm2c PROPERTIES COMPILE_FLAGS "${ZIG_WASM2C_COMPILE
+ 
+ add_custom_command(
+   OUTPUT "${ZIG1_C_SOURCE}"
+-  COMMAND zig-wasm2c "${ZIG1_WASM_MODULE}" "${ZIG1_C_SOURCE}"
++  COMMAND $<TARGET_FILE:zig-wasm2c> "${ZIG1_WASM_MODULE}" "${ZIG1_C_SOURCE}"
+   DEPENDS zig-wasm2c "${ZIG1_WASM_MODULE}"
+   COMMENT "Converting ${ZIG1_WASM_MODULE} to ${ZIG1_C_SOURCE}"
+   WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+-- 
+2.34.1
