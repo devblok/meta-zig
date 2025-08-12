@@ -28,7 +28,7 @@ ZIG_BUILD_ARGS ??= ""
 # Additional zig build arguments
 EXTRA_ZIGBUILD ??= ""
 
-DEPENDS:append = " zig-native pkgconf-native"
+DEPENDS:append = " zig-native"
 
 def zig_target_map(d):
     """Map OE target architecture to Zig target triple with glibc ABI version"""
@@ -105,6 +105,7 @@ zig_do_compile() {
     
     cd ${S}
     ${ZIG} build \
+        --search-prefix ${RECIPE_SYSROOT}/usr \
         --prefix-exe-dir ${B}/bin \
         --prefix-lib-dir ${B}/lib \
         --prefix-include-dir ${B}/include \
