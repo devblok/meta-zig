@@ -6,8 +6,8 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=d934d7758eb646c9c6a2162d88427689"
 
 DEPENDS = "clang-native cmake-native ninja-native python3-native zlib-native zstd-native"
 
-SRCREV = "d03a147ea0a590ca711b3db07106effc559b0fc6"
-SRC_URI = "git://github.com/ziglang/zig.git;protocol=https;branch=0.14.x \
+SRCREV = "98585af51d2611584d329ab4defe444a44b8f35e"
+SRC_URI = "git://github.com/ziglang/zig.git;protocol=https;branch=0.15.x \
            file://0001-fix-zig-wasm2c-path.patch"
 
 S = "${WORKDIR}/git"
