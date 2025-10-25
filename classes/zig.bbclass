@@ -16,7 +16,8 @@ ZIG_BUILD_MODE ??= "ReleaseSafe"
 ZIG_TARGET ??= "${@zig_target_map(d)}"
 
 # Build directory
-B ?= "${WORKDIR}/build"
+ZIG_OUT = "${WORKDIR}/build"
+B ?= "${ZIG_OUT}"
 
 # Zig cache directories
 ZIG_CACHE_DIR ?= "${WORKDIR}/.zig-cache"
@@ -106,9 +107,7 @@ zig_do_compile() {
     cd ${S}
     ${ZIG} build \
         --search-prefix ${RECIPE_SYSROOT}/usr \
-        --prefix-exe-dir ${B}/bin \
-        --prefix-lib-dir ${B}/lib \
-        --prefix-include-dir ${B}/include \
+        --prefix ${ZIG_OUT} \
         --cache-dir ${ZIG_CACHE_DIR} \
         --global-cache-dir ${ZIG_GLOBAL_CACHE_DIR} \
         -Doptimize=${ZIG_BUILD_MODE} \
@@ -121,15 +120,16 @@ zig_do_install() {
     bbnote "Installing Zig project"
     
     # Install binaries
-    if [ -d "${B}/bin" ]; then
+    if [ -d "${ZIG_OUT}/bin" ]; then
         install -d ${D}${bindir}
-        install -m 755 ${B}/bin/* ${D}${bindir}/
+        install -m 755 ${ZIG_OUT}/bin/* ${D}${bindir}/
+        bbnote "Installed binaries"
     fi
     
     # Install headers
-    if [ -d "${B}/include" ]; then
+    if [ -d "${ZIG_OUT}/include" ]; then
         install -d ${D}${includedir}
-        cp -r ${B}/include/* ${D}${includedir}/
+        cp -r ${ZIG_OUT}/include/* ${D}${includedir}/
     fi
 }
 
