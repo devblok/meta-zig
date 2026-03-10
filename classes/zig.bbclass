@@ -15,6 +15,9 @@ ZIG_BUILD_MODE ??= "ReleaseSafe"
 # Target architecture for cross-compilation
 ZIG_TARGET ??= "${@zig_target_map(d)}"
 
+# Target CPU for architecture-specific optimizations (e.g. cortex_a76, oryon_1)
+ZIG_MCPU ??= ""
+
 # Build directory
 ZIG_OUT = "${WORKDIR}/build"
 B ?= "${ZIG_OUT}"
@@ -112,6 +115,7 @@ zig_do_compile() {
         --global-cache-dir ${ZIG_GLOBAL_CACHE_DIR} \
         -Doptimize=${ZIG_BUILD_MODE} \
         -Dtarget=${ZIG_TARGET} \
+        ${@'-Dcpu=' + d.getVar('ZIG_MCPU') if d.getVar('ZIG_MCPU') else ''} \
         ${ZIG_BUILD_ARGS} \
         ${EXTRA_ZIGBUILD}
 }
