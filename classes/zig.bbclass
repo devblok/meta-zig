@@ -77,6 +77,15 @@ def zig_target_map(d):
         # Use older glibc version to avoid __isoc23_ symbols (introduced in 2.38+)
         glibc_version = d.getVar('GLIBC_VERSION') or '2.41'
         return f"{zig_arch}-{zig_os}-gnu.{glibc_version}"
+    elif target_os == 'linux-gnueabi':
+        # 32-bit ARM: OE keeps TARGET_OS at 'linux-gnueabi' and encodes the
+        # float ABI in TUNE_FEATURES, but Zig needs it in the triple —
+        # 'gnueabi' would emit soft-float calls, ABI-incompatible with a
+        # hard-float rootfs (e.g. Zynq-7000 cortexa9thf-neon).
+        tune = (d.getVar('TUNE_FEATURES') or '').split()
+        abi = 'gnueabihf' if 'callconvention-hard' in tune else 'gnueabi'
+        glibc_version = d.getVar('GLIBC_VERSION') or (d.getVar('GLIBCVERSION') or '2.39').rstrip('%')
+        return f"{zig_arch}-linux-{abi}.{glibc_version}"
     else:
         return f"{zig_arch}-{zig_os}"
 
