@@ -6,14 +6,15 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=d934d7758eb646c9c6a2162d88427689"
 
 DEPENDS = "zig-llvm-native python3-native zlib-native zstd-native"
 
-# Zig's canonical source is now Codeberg (github.com/ziglang/zig is a stale
-# mirror). Pinned to the 0.16.x branch HEAD (0.16.0 release + stabilization
-# fixes) -- the 0.16.0 tag itself had a std bug (os/emscripten.zig STOPSIG
-# declared u32 but returns the SIG enum) that broke wasm32-emscripten builds.
+# Zig's canonical source is Codeberg (github.com/ziglang/zig is a stale
+# mirror). Preserve this 0.16.x-era commit, retained under pull-request refs
+# rather than a current 0.16.x branch. Validate the exact SRCREV in any ref.
+# The 0.16.0 tag itself had a std bug (os/emscripten.zig STOPSIG declared u32
+# but returns the SIG enum) that broke wasm32-emscripten builds.
 # Zig 0.16 statically links LLVM/Clang/LLD 21, supplied only by the private
 # zig-llvm-native dependency. Wrynose's ordinary LLVM 22 is not a substitute.
 SRCREV = "7056ba9a5c750305726be862a51ff18e2318c138"
-SRC_URI = "git://codeberg.org/ziglang/zig.git;protocol=https;branch=0.16.x \
+SRC_URI = "git://codeberg.org/ziglang/zig.git;protocol=https;nobranch=1 \
            file://0001-fix-zig-wasm2c-path.patch \
            file://0002-cmake-select-private-LLVM-toolchain.patch"
 

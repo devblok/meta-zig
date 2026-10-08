@@ -7,8 +7,13 @@ successful Yocto builds or Pluto hardware qualification.
 
 ## Toolchain boundary
 
-Zig revision `7056ba9a5c750305726be862a51ff18e2318c138` from Codeberg's
-`0.16.x` branch needs LLVM/Clang/LLD **21**. Wrynose's ordinary LLVM **22.1.8**
+Zig revision `7056ba9a5c750305726be862a51ff18e2318c138` is the preserved
+0.16.x-era Codeberg source pin and needs LLVM/Clang/LLD **21**. The recipe uses
+`nobranch=1` to validate that exact commit in any ref namespace, not the absent
+`0.16.x` branch. The observed fetched cache retains it under PR refs 35981 and
+35983; this does not prove future ref retention or actual fetch-task success.
+Neither the compiler source pin nor its version was upgraded.
+Wrynose's ordinary LLVM **22.1.8**
 is not a substitute. `zig-native` retains its public recipe name and depends
 on `zig-llvm-native`, built from the layer's existing LLVM **21.1.8** monolithic
 release archive:
@@ -39,6 +44,16 @@ There is **no global LLVM21 version/provider contract**. The old preferred
 versions for `clang` and `clang-native` are removed. The `clang-layer` dependency
 is deliberately retained; changing manifest/layer dependencies is outside
 this component's scope. OE-Core supplies ordinary Wrynose compiler recipes.
+
+## Canonical repository workflow
+
+Use this layer in ordinary `repo init` / `repo sync` project checkouts from the
+Pluto Wrynose manifest. Repo manages Git metadata under that workspace's own
+`.repo`; do not attach another workspace's `.git` stores or use linked worktrees.
+For development, use `repo start wrynose layers/meta-zig` only if that branch is
+not already present. Local commits require separately approved publication
+before remote consumers can sync their manifest pins. The deleted Scarthgap
+workspace is not a dependency.
 
 ## Active and dormant metadata
 
@@ -121,6 +136,11 @@ The source repository is read-only; the tests use the pinned revision, not
 its current HEAD. Generated fixtures live in disposable directories inside
 this worktree. The full gate needs both source inputs: without them the
 source/CMake tests are explicitly skipped, not counted as qualification.
+
+All seven current cases passed with both source inputs supplied and no skips.
+The exact SHA/URI regression permits only the branch-validation change relative
+to the published migration recipe; every other noncomment recipe line is kept.
+Actual fetch-task validation remains external.
 
 Checks cover recipe discovery, class/path/provider boundaries, preservation
 of the public class interface and ARM mapping, the release checksum and all

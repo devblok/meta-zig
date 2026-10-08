@@ -103,6 +103,24 @@ class MetadataTests(unittest.TestCase):
                           'do_configure[depends] += "zig-native:do_populate_sysroot"'):
             self.assertIn(interface, cls)
 
+    def test_pinned_source_fetch_policy(self):
+        text = ZIG_RECIPE.read_text()
+        revision = re.search(r'^SRCREV = "([^"]+)"', text, re.M).group(1)
+        uris = re.search(r'SRC_URI = "([^"]+)"', text).group(1).split()
+        git_uris = [uri for uri in uris if uri.startswith("git://")]
+        self.assertEqual(revision, ZIG_REV)
+        self.assertEqual(git_uris, [
+            "git://codeberg.org/ziglang/zig.git;protocol=https;nobranch=1",
+        ])
+        original = run("git", "show",
+                       "6672955:recipes-devtools/zig/zig-native_git.bb").stdout
+        # No recipe behavior changes beyond the branch-validation parameter.
+        def metadata(value):
+            return [line for line in value.splitlines()
+                    if line.strip() and not line.lstrip().startswith("#")]
+        self.assertEqual(metadata(text),
+                         metadata(original.replace("branch=0.16.x", "nobranch=1")))
+
     def test_private_paths_and_source_conventions(self):
         llvm = LLVM_RECIPE.read_text()
         zig = ZIG_RECIPE.read_text()
