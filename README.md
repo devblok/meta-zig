@@ -24,10 +24,13 @@ release archive:
 - The private recipe builds static LLVM, Clang and LLD component libraries,
   all default LLVM 21 backends (including ARM, NEON support and SPIRV), headers,
   CMake exports and the native tools referenced by those exports.
-- Everything is installed/staged under
-  `${STAGING_LIBDIR_NATIVE}/zig-llvm-21/{bin,lib,include,share,...}`. No tools,
-  headers, libraries or CMake packages are installed in the ordinary native
-  LLVM paths. The private binaries are not added to the general tool PATH.
+- The recipe confines installation/staging to
+  `${STAGING_LIBDIR_NATIVE}/zig-llvm-21/{bin,lib,include,share,...}`. Its
+  `:class-native` install-path overrides survive Wrynose's deferred `native`
+  inheritance. The ordinary native staging root is retained for sstate's
+  producer-root trimming and rebasing into a consumer's native sysroot.
+  Tools, headers, libraries and CMake packages must remain private; the
+  private binaries are not added to the general tool PATH.
 - `zig-native` selects the private `llvm-config` explicitly. Its patched CMake
   finders reject a wrong LLVM version or missing backend and require every
   Clang/LLD library from the private prefix; they cannot fall back to a host
@@ -137,10 +140,15 @@ its current HEAD. Generated fixtures live in disposable directories inside
 this worktree. The full gate needs both source inputs: without them the
 source/CMake tests are explicitly skipped, not counted as qualification.
 
-All seven current cases passed with both source inputs supplied and no skips.
-The exact SHA/URI regression permits only the branch-validation change relative
-to the published migration recipe; every other noncomment recipe line is kept.
-Actual fetch-task validation remains external.
+All ten current cases passed with both source inputs supplied and no skips.
+The earlier seven-case gate missed the producer's deferred-inheritance path
+problem. A reported Zig configure failure and read-only producer artifacts
+showed LLVM installing into ordinary `usr/bin` while private-only staging
+copied nothing. The install paths now use `:class-native` overrides; the new
+literal metadata regression rejects the former plain assignments and permits
+only those qualifiers beyond the earlier producer recipe's noncomment lines.
+The exact Zig SHA/URI regression still permits only the earlier branch-validation
+change relative to its published migration recipe. Actual fetch remains external.
 
 Checks cover recipe discovery, class/path/provider boundaries, preservation
 of the public class interface and ARM mapping, the release checksum and all
@@ -149,7 +157,15 @@ and zero-offset patch application, and synthetic CMake discovery with mock
 static libraries. CMake tests prove private-path selection and rejection of
 LLVM22, missing ARM support, missing llvm-config, and missing private
 Clang/LLD libraries even when an ordinary prefix supplies matching names.
-These fixtures **do not compile or link LLVM or Zig**.
+A separate synthetic CMake `NONE` fixture installs a mock tool, static libraries,
+headers, CMake exports and data into a disposable producer image. Its two
+inspected copy boundaries model private-only staging and native-root trimming,
+then rebase the component into a different consumer sysroot. Tests check mock
+self-relocation, imported tool/library/header paths and absence of ordinary LLVM
+payloads; a negative ordinary-prefix installation reproduces the empty private
+component. This is not a BitBake parser, execution of staging tasks, or proof of
+real LLVM exports/sstate relocation. These fixtures **do not compile or link
+LLVM or Zig**.
 
 ## Qualification still required
 
@@ -157,6 +173,10 @@ No Yocto, BitBake, devtool, setup sourcing or other Yocto tooling was run for
 this migration. Actual parsing/signatures, LLVM21 and pinned Zig compilation,
 static linking, sysroot population/coexistence, sstate relocation, SPDX3
 output, `hello-zig` cross-compilation and Pluto execution remain unverified.
+The amended LLVM configure/install/sysroot-population and Zig configure/build/link
+must be validated in a capable environment. Existing producer images/components,
+consumer sysroots and caches were not repaired manually or cleaned; the observed
+old failure artifacts do not prove a successful rebuild.
 The all-backend monolithic build can require substantial RAM and disk.
 Product, BSP, manifest and deployment migration/qualification are separate
 coordinator-owned work. No SDK support or hardware behavior is claimed here.

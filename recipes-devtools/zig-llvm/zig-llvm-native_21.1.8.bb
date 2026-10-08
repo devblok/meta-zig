@@ -23,18 +23,20 @@ inherit cmake python3native native
 
 # Keep tools, headers, libraries, CMake exports and data below one private
 # prefix, including after sstate relocation into a consumer's native sysroot.
+# Wrynose defers native inheritance; qualified paths must survive its later
+# ordinary native-prefix assignments or private-only staging copies nothing.
 ZIG_LLVM_PREFIX = "${STAGING_LIBDIR_NATIVE}/zig-llvm-21"
-prefix = "${ZIG_LLVM_PREFIX}"
-exec_prefix = "${prefix}"
-bindir = "${prefix}/bin"
-sbindir = "${prefix}/sbin"
-libexecdir = "${prefix}/libexec"
-libdir = "${prefix}/lib"
-includedir = "${prefix}/include"
-datadir = "${prefix}/share"
-sysconfdir = "${prefix}/etc"
-sharedstatedir = "${prefix}/com"
-localstatedir = "${prefix}/var"
+prefix:class-native = "${ZIG_LLVM_PREFIX}"
+exec_prefix:class-native = "${prefix}"
+bindir:class-native = "${prefix}/bin"
+sbindir:class-native = "${prefix}/sbin"
+libexecdir:class-native = "${prefix}/libexec"
+libdir:class-native = "${prefix}/lib"
+includedir:class-native = "${prefix}/include"
+datadir:class-native = "${prefix}/share"
+sysconfdir:class-native = "${prefix}/etc"
+sharedstatedir:class-native = "${prefix}/com"
+localstatedir:class-native = "${prefix}/var"
 SYSROOT_DIRS = "${ZIG_LLVM_PREFIX}"
 SYSROOT_DIRS_NATIVE = ""
 
