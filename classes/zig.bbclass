@@ -32,6 +32,10 @@ ZIG_BUILD_ARGS ??= ""
 # Additional zig build arguments
 EXTRA_ZIGBUILD ??= ""
 
+# Let OE supply pkgconf-native and the target sysroot environment. Hardcoded
+# pkg-config exports omit the provider dependency and bypass class defaults.
+inherit pkgconfig
+
 DEPENDS:append = " zig-native"
 
 def zig_target_map(d):
@@ -109,12 +113,6 @@ zig_do_compile() {
     # Create cache directories
     mkdir -p ${ZIG_CACHE_DIR}
     mkdir -p ${ZIG_GLOBAL_CACHE_DIR}
-    
-    # Set PKG_CONFIG environment variables for cross-compilation
-    export PKG_CONFIG="${STAGING_BINDIR_NATIVE}/pkg-config"
-    export PKG_CONFIG_PATH="${STAGING_DIR_TARGET}${libdir}/pkgconfig:${STAGING_DIR_TARGET}${datadir}/pkgconfig"
-    export PKG_CONFIG_LIBDIR="${STAGING_DIR_TARGET}${libdir}/pkgconfig:${STAGING_DIR_TARGET}${datadir}/pkgconfig"
-    export PKG_CONFIG_SYSROOT_DIR="${STAGING_DIR_TARGET}"
     
     cd ${S}
     ${ZIG} build \

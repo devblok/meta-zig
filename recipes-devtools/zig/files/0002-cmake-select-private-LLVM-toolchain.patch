@@ -1,0 +1,144 @@
+From: devblok <l.praninskas@gmail.com>
+Subject: [PATCH] cmake: Allow selecting a private static LLVM toolchain
+
+Findllvm unconditionally clears the llvm-config cache entry and searches
+PATH. Accept an explicit executable without falling back to another LLVM
+on failure. This keeps Zig's LLVM 21 requirement isolated from the ordinary
+native LLVM provider.
+
+When a private prefix is supplied, require Clang and LLD headers and every
+static library from that prefix. Preserve the pinned source's library order
+and the default discovery behavior for builds without a private prefix.
+
+Upstream-Status: Inappropriate [OE private native toolchain isolation]
+---
+
+diff --git a/cmake/Findllvm.cmake b/cmake/Findllvm.cmake
+--- a/cmake/Findllvm.cmake
++++ b/cmake/Findllvm.cmake
+@@ -12,17 +12,29 @@
+ if(ZIG_USE_LLVM_CONFIG)
+   set(LLVM_CONFIG_ERROR_MESSAGES "")
+   while(1)
+-    # If this variable is not unset, the same result is returned even though
+-    # the ignore list has changed, causing the configure process to not
+-    # terminate when the right LLVM version is not found.
+-    unset(LLVM_CONFIG_EXE CACHE)
+-    find_program(LLVM_CONFIG_EXE
+-        NAMES llvm-config-21 llvm-config-21.0 llvm-config210 llvm-config21 llvm-config NAMES_PER_DIR
+-        PATHS
+-            "/mingw64/bin"
+-            "/c/msys64/mingw64/bin"
+-            "c:/msys64/mingw64/bin"
+-            "C:/Libraries/llvm-21.0.0/bin")
++    if(ZIG_LLVM_CONFIG_EXECUTABLE)
++      # An explicit toolchain must fail instead of searching another prefix.
++      if(NOT LLVM_CONFIG_ERROR_MESSAGES STREQUAL "")
++        list(JOIN LLVM_CONFIG_ERROR_MESSAGES "\n" LLVM_CONFIG_ERROR_MESSAGE)
++        message(FATAL_ERROR ${LLVM_CONFIG_ERROR_MESSAGE})
++      endif()
++      if(NOT EXISTS "${ZIG_LLVM_CONFIG_EXECUTABLE}")
++        message(FATAL_ERROR "missing private llvm-config: ${ZIG_LLVM_CONFIG_EXECUTABLE}")
++      endif()
++      set(LLVM_CONFIG_EXE "${ZIG_LLVM_CONFIG_EXECUTABLE}")
++    else()
++      # If this variable is not unset, the same result is returned even though
++      # the ignore list has changed, causing the configure process to not
++      # terminate when the right LLVM version is not found.
++      unset(LLVM_CONFIG_EXE CACHE)
++      find_program(LLVM_CONFIG_EXE
++          NAMES llvm-config-21 llvm-config-21.0 llvm-config210 llvm-config21 llvm-config NAMES_PER_DIR
++          PATHS
++              "/mingw64/bin"
++              "/c/msys64/mingw64/bin"
++              "c:/msys64/mingw64/bin"
++              "C:/Libraries/llvm-21.0.0/bin")
++    endif()
+
+     if ("${LLVM_CONFIG_EXE}" STREQUAL "LLVM_CONFIG_EXE-NOTFOUND")
+       if (NOT LLVM_CONFIG_ERROR_MESSAGES STREQUAL "")
+diff --git a/cmake/Findclang.cmake b/cmake/Findclang.cmake
+--- a/cmake/Findclang.cmake
++++ b/cmake/Findclang.cmake
+@@ -6,6 +6,49 @@
+ # CLANG_INCLUDE_DIRS
+ # CLANG_LIBRARIES
+ # CLANG_LIBDIRS
++
++if(ZIG_LLVM_PREFIX)
++  # Do not mix the private LLVM with ordinary native or host libraries.
++  find_path(CLANG_INCLUDE_DIRS NAMES clang/Frontend/ASTUnit.h
++    PATHS "${ZIG_LLVM_PREFIX}/include" NO_DEFAULT_PATH REQUIRED)
++  foreach(_libname
++    clangFrontendTool
++    clangCodeGen
++    clangFrontend
++    clangDriver
++    clangSerialization
++    clangSema
++    clangStaticAnalyzerFrontend
++    clangStaticAnalyzerCheckers
++    clangStaticAnalyzerCore
++    clangAnalysis
++    clangASTMatchers
++    clangAST
++    clangParse
++    clangSema
++    clangAPINotes
++    clangBasic
++    clangEdit
++    clangLex
++    clangRewriteFrontend
++    clangRewrite
++    clangCrossTU
++    clangIndex
++    clangToolingCore
++    clangExtractAPI
++    clangSupport
++    clangInstallAPI
++    clangAST
++  )
++    string(TOUPPER ${_libname} _prettylibname)
++    find_library(CLANG_${_prettylibname}_LIB NAMES ${_libname}
++      PATHS "${ZIG_LLVM_PREFIX}/lib" NO_DEFAULT_PATH REQUIRED)
++    list(APPEND CLANG_LIBRARIES "${CLANG_${_prettylibname}_LIB}")
++  endforeach()
++  include(FindPackageHandleStandardArgs)
++  find_package_handle_standard_args(clang DEFAULT_MSG CLANG_LIBRARIES CLANG_INCLUDE_DIRS)
++  return()
++endif()
+
+ find_path(CLANG_INCLUDE_DIRS NAMES clang/Frontend/ASTUnit.h
+   HINTS ${LLVM_INCLUDE_DIRS}
+diff --git a/cmake/Findlld.cmake b/cmake/Findlld.cmake
+--- a/cmake/Findlld.cmake
++++ b/cmake/Findlld.cmake
+@@ -5,6 +5,28 @@
+ # LLD_FOUND
+ # LLD_INCLUDE_DIRS
+ # LLD_LIBRARIES
++
++if(ZIG_LLVM_PREFIX)
++  # Do not mix the private LLVM with ordinary native or host libraries.
++  find_path(LLD_INCLUDE_DIRS NAMES lld/Common/Driver.h
++    PATHS "${ZIG_LLVM_PREFIX}/include" NO_DEFAULT_PATH REQUIRED)
++  foreach(_libname
++    lldMinGW
++    lldELF
++    lldCOFF
++    lldWasm
++    lldMachO
++    lldCommon
++  )
++    string(TOUPPER ${_libname} _prettylibname)
++    find_library(LLD_${_prettylibname}_LIB NAMES ${_libname}
++      PATHS "${ZIG_LLVM_PREFIX}/lib" NO_DEFAULT_PATH REQUIRED)
++    list(APPEND LLD_LIBRARIES "${LLD_${_prettylibname}_LIB}")
++  endforeach()
++  include(FindPackageHandleStandardArgs)
++  find_package_handle_standard_args(lld DEFAULT_MSG LLD_LIBRARIES LLD_INCLUDE_DIRS)
++  return()
++endif()
+
+ find_path(LLD_INCLUDE_DIRS NAMES lld/Common/Driver.h
+     HINTS ${LLVM_INCLUDE_DIRS}

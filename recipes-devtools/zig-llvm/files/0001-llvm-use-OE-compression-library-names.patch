@@ -1,0 +1,56 @@
+From: Khem Raj <raj.khem@gmail.com>
+Date: Fri, 12 Aug 2022 11:50:57 -0700
+Subject: [PATCH] llvm: Use OE compression library names
+
+OE builds zstd with make, not CMake. Keep installed LLVM exports and
+llvm-config's system library list independent of imported compression
+targets and of absolute paths in the producer's native sysroot.
+
+Rebase the layer's vendored 0028 compression-library patch onto the
+unmodified LLVM 21.1.8 monolith. Target driver/runtime patches are not
+needed for this private native library dependency.
+
+Upstream-Status: Inappropriate [OE-specific library exports]
+---
+ llvm/lib/Support/CMakeLists.txt | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/llvm/lib/Support/CMakeLists.txt b/llvm/lib/Support/CMakeLists.txt
+--- a/llvm/lib/Support/CMakeLists.txt
++++ b/llvm/lib/Support/CMakeLists.txt
+@@ -22,7 +22,7 @@ if (HAS_WERROR_GLOBAL_CTORS)
+ endif()
+
+ if(LLVM_ENABLE_ZLIB)
+-  list(APPEND imported_libs ZLIB::ZLIB)
++  list(APPEND imported_libs z)
+ endif()
+
+ if(LLVM_ENABLE_ZSTD)
+@@ -34,7 +34,7 @@ if(LLVM_ENABLE_ZSTD)
+ endif()
+
+ if(LLVM_ENABLE_ZSTD)
+-  list(APPEND imported_libs ${zstd_target})
++  list(APPEND imported_libs zstd)
+ endif()
+
+ if( WIN32 )
+@@ -339,7 +339,7 @@ if(LLVM_ENABLE_ZLIB)
+     get_property(zlib_library TARGET ZLIB::ZLIB PROPERTY LOCATION)
+   endif()
+   get_library_name(${zlib_library} zlib_library)
+-  set(llvm_system_libs ${llvm_system_libs} "${zlib_library}")
++  set(llvm_system_libs ${llvm_system_libs} z)
+ endif()
+
+ if(LLVM_ENABLE_ZSTD)
+@@ -353,7 +353,7 @@ if(LLVM_ENABLE_ZSTD)
+   endif()
+   if (zstd_target STREQUAL zstd::libzstd_shared)
+     get_library_name(${zstd_library} zstd_library)
+-    set(llvm_system_libs ${llvm_system_libs} "${zstd_library}")
++    set(llvm_system_libs ${llvm_system_libs} zstd)
+   else()
+     set(llvm_system_libs ${llvm_system_libs} "${zstd_STATIC_LIBRARY}")
+   endif()

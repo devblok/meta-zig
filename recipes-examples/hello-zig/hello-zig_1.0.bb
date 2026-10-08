@@ -8,7 +8,7 @@ SRC_URI = " \
     file://build.zig \
 "
 
-S = "${WORKDIR}"
+S = "${UNPACKDIR}"
 
 inherit zig
 

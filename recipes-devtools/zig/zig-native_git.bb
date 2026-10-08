@@ -4,32 +4,36 @@ HOMEPAGE = "https://ziglang.org/"
 LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=d934d7758eb646c9c6a2162d88427689"
 
-DEPENDS = "clang-native cmake-native ninja-native python3-native zlib-native zstd-native"
+DEPENDS = "zig-llvm-native python3-native zlib-native zstd-native"
 
 # Zig's canonical source is now Codeberg (github.com/ziglang/zig is a stale
 # mirror). Pinned to the 0.16.x branch HEAD (0.16.0 release + stabilization
 # fixes) -- the 0.16.0 tag itself had a std bug (os/emscripten.zig STOPSIG
 # declared u32 but returns the SIG enum) that broke wasm32-emscripten builds.
-# Zig 0.16 statically links LLVM/clang/lld 21 (see PREFERRED_VERSION_clang*
-# in meta-zig/conf/layer.conf, which selects the vendored LLVM-21 clang recipe).
+# Zig 0.16 statically links LLVM/Clang/LLD 21, supplied only by the private
+# zig-llvm-native dependency. Wrynose's ordinary LLVM 22 is not a substitute.
 SRCREV = "7056ba9a5c750305726be862a51ff18e2318c138"
 SRC_URI = "git://codeberg.org/ziglang/zig.git;protocol=https;branch=0.16.x \
-           file://0001-fix-zig-wasm2c-path.patch"
+           file://0001-fix-zig-wasm2c-path.patch \
+           file://0002-cmake-select-private-LLVM-toolchain.patch"
 
-S = "${WORKDIR}/git"
+# Wrynose's git fetcher unpacks into BB_GIT_DEFAULT_DESTSUFFIX = BP.
+S = "${UNPACKDIR}/${BP}"
 
 inherit cmake native
 
-DEPENDS = "clang-native cmake-native ninja-native python3-native zlib-native zstd-native"
+ZIG_LLVM_PREFIX = "${STAGING_LIBDIR_NATIVE}/zig-llvm-21"
 
 EXTRA_OECMAKE = " \
-    -DCMAKE_PREFIX_PATH='${STAGING_DIR_NATIVE}' \
+    -DCMAKE_PREFIX_PATH='${ZIG_LLVM_PREFIX}' \
+    -DZIG_LLVM_PREFIX='${ZIG_LLVM_PREFIX}' \
+    -DZIG_LLVM_CONFIG_EXECUTABLE='${ZIG_LLVM_PREFIX}/bin/llvm-config' \
+    -DZIG_USE_LLVM_CONFIG=ON \
     -DZIG_STATIC_LLVM=ON \
     -DZIG_STATIC_ZLIB=ON \
     -DZIG_STATIC_ZSTD=ON \
     -DCMAKE_BUILD_TYPE=Release \
     -DZIG_TARGET_MCPU=baseline \
-    -G Ninja \
 "
 
 # Zig needs a lot of memory during compilation
@@ -38,11 +42,9 @@ EXTRA_OECMAKE = " \
 do_install() {
     install -d ${D}${bindir}
     install -m 755 ${B}/stage3/bin/zig ${D}${bindir}/zig
-    
-    # Install lib directory for zig std library and builtin modules
-    if [ -d "${B}/stage3/lib" ]; then
-        cp -r ${B}/stage3/lib ${D}${prefix}/
-    fi
+
+    # The standard library is required, not an optional installation artifact.
+    cp -R ${B}/stage3/lib ${D}${prefix}/
 }
 
 

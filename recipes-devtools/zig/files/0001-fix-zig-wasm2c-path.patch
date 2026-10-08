@@ -9,7 +9,7 @@ This causes "command not found" errors during build.
 Use CMake's TARGET_FILE generator expression to get the full path
 to the built zig-wasm2c executable.
 
-Signed-off-by: Claude Code <noreply@anthropic.com>
+Upstream-Status: Pending
 ---
  CMakeLists.txt | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
@@ -18,7 +18,7 @@ diff --git a/CMakeLists.txt b/CMakeLists.txt
 index 1234567..abcdefg 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -839,7 +839,7 @@ set_target_properties(zig-wasm2c PROPERTIES COMPILE_FLAGS "${ZIG_WASM2C_COMPILE
+@@ -652,7 +652,7 @@ set_target_properties(zig-wasm2c PROPERTIES COMPILE_FLAGS "${ZIG_WASM2C_COMPILE
  
  add_custom_command(
    OUTPUT "${ZIG1_C_SOURCE}"

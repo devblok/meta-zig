@@ -1,258 +1,147 @@
-# meta-zig
+# meta-zig — Wrynose migration
 
-OpenEmbedded/Yocto layer for the Zig programming language.
+This branch provides the pinned **Zig 0.16.x native compiler**, the existing
+`zig.bbclass` cross-build interface, and `hello-zig`. It declares Wrynose
+compatibility as a **static-validated migration candidate**, not as a claim of
+successful Yocto builds or Pluto hardware qualification.
 
-This layer provides:
-- Native Zig 0.15.1 compiler built from source using meta-clang's LLVM 20.1.1
-- `zig.bbclass` for building Zig projects with full cross-compilation support
-- Integration with Yocto's build system and staging areas
-- Extended LLVM target support for comprehensive cross-compilation
-- Example projects demonstrating Zig integration patterns
+## Toolchain boundary
 
-## Quick Start
+Zig revision `7056ba9a5c750305726be862a51ff18e2318c138` from Codeberg's
+`0.16.x` branch needs LLVM/Clang/LLD **21**. Wrynose's ordinary LLVM **22.1.8**
+is not a substitute. `zig-native` retains its public recipe name and depends
+on `zig-llvm-native`, built from the layer's existing LLVM **21.1.8** monolithic
+release archive:
 
-```bash
-# Add layer to bblayers.conf
-bitbake-layers add-layer /path/to/meta-zig
+- SHA256: `4633a23617fa31a3ea51242586ea7fb1da7140e426bd62fc164261fe036aa142`
+- Original recipe/patch provenance: meta-clang walnascar, vendored at
+  `9880651562c713b28dbd99797a5d1b138955a7cf` and retained in this layer's history.
+- The private recipe builds static LLVM, Clang and LLD component libraries,
+  all default LLVM 21 backends (including ARM, NEON support and SPIRV), headers,
+  CMake exports and the native tools referenced by those exports.
+- Everything is installed/staged under
+  `${STAGING_LIBDIR_NATIVE}/zig-llvm-21/{bin,lib,include,share,...}`. No tools,
+  headers, libraries or CMake packages are installed in the ordinary native
+  LLVM paths. The private binaries are not added to the general tool PATH.
+- `zig-native` selects the private `llvm-config` explicitly. Its patched CMake
+  finders reject a wrong LLVM version or missing backend and require every
+  Clang/LLD library from the private prefix; they cannot fall back to a host
+  or ordinary native provider. Default upstream discovery is unchanged when
+  these private options are absent.
+- The compression-library export patch is rebased from the vendored patch
+  `0028`. It keeps zlib/zstd references independent of the producer's absolute
+  sysroot and imported CMake compression targets. Target-driver, runtime,
+  LLDB, SDK and cross-toolchain patches are not carried into this native-only
+  dependency. The old executable-export suppression patch is unnecessary:
+  native tools and exports are staged together in the private subtree.
 
-# Build Zig compiler
-bitbake zig-native
+There is **no global LLVM21 version/provider contract**. The old preferred
+versions for `clang` and `clang-native` are removed. The `clang-layer` dependency
+is deliberately retained; changing manifest/layer dependencies is outside
+this component's scope. OE-Core supplies ordinary Wrynose compiler recipes.
 
-# Test with example
-bitbake hello-zig
-```
+## Active and dormant metadata
 
-## Requirements
+`conf/layer.conf` discovers only:
 
-### System Requirements
-- **RAM**: Minimum 8GB (16GB recommended for parallel builds)
-- **Disk Space**: ~2GB additional for LLVM with all targets
-- **Build Host**: x86_64 architecture (for native compiler bootstrap)
-- **Network**: Internet access for source downloads
+- `recipes-devtools/zig-llvm/zig-llvm-native_*.bb`
+- `recipes-devtools/zig/zig-native_*.bb`
+- `recipes-examples/*/*.bb`
 
-### Yocto/OpenEmbedded Compatibility
-| Yocto Release | Status | Notes |
-|---------------|--------|-------|
-| Scarthgap (5.0) | ✅ Supported | Tested primary target |
-| Styhead (5.1) | ✅ Supported | Current development |
-| Walnascar (6.0) | ✅ Supported | Future release |
+The complete old `recipes-devtools/clang/` suite and its broad
+`clang_git.bbappend` remain in the checkout for provenance but are **not
+exposed through BBFILES**. They are **not qualified for Wrynose**, target use,
+SDK use, shared-source SPDX generation, or coexistence with ordinary LLVM.
+Do not re-enable them as a workaround. This layer does not provide Zig in an
+SDK, target LLVM21, compiler-rt, libc++, LLDB, OpenMP or a global clang override.
 
-## Dependencies
+The active LLVM recipe owns its normal fetch/unpack/patch tasks and source
+tree under `${UNPACKDIR}`. It does not reuse the obsolete `work-shared` source
+provider, delete source tasks, or override SPDX shared-source detection.
+Wrynose's normal SPDX3 dependency/task ordering applies. The `cmake` class
+supplies the **cmake-native recipe dependency** and Ninja; the removed
+`cmake-native` **class** is neither inherited nor copied into this layer.
 
-### Layer Dependencies
-Add these layers to your `bblayers.conf` in order:
+Git sources now follow Wrynose's `${UNPACKDIR}/${BP}` default destination;
+`hello-zig`'s local files use `${UNPACKDIR}`. The example uses the pinned Zig
+series' `root_module` and `std.Io`/`std.process.Init` interfaces.
 
-```bash
-BBLAYERS += " \
-    /path/to/openembedded-core/meta \
-    /path/to/meta-openembedded \
-    /path/to/meta-clang \
-    /path/to/meta-zig \
-"
-```
+## Building projects with `zig.bbclass`
 
-**Required layers:**
-- **meta-clang**: LLVM/Clang infrastructure (must support LLVM 20.1.1+)
-- **openembedded-core**: Base OE functionality  
-- **meta-openembedded**: Additional build tools
+The public class variables and target mapping are preserved:
 
-### Build Dependencies
-Automatically resolved by recipes:
-- `clang-native` (LLVM 20.1.1)
-- `cmake-native`, `ninja-native`
-- `python3-native`
-- `zlib-native`, `zstd-native`
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `TOOLCHAIN_zig` | `zig` | Existing toolchain identifier |
+| `ZIG` | `${STAGING_BINDIR_NATIVE}/zig` | Native compiler |
+| `ZIG_BUILD_MODE` | `ReleaseSafe` | Optimization mode |
+| `ZIG_TARGET` | `zig_target_map(d)` | Cross-compilation triple |
+| `ZIG_MCPU` | Empty | Optional `-Dcpu=` selection |
+| `ZIG_OUT` | `${WORKDIR}/build` | Installation/build output |
+| `ZIG_BUILD_ARGS` | Empty | Arguments to `zig build` |
+| `EXTRA_ZIGBUILD` | Empty | Additional arguments |
+| `ZIG_CACHE_DIR` | `${WORKDIR}/.zig-cache` | Per-recipe cache |
+| `ZIG_GLOBAL_CACHE_DIR` | `${TMPDIR}/zig-cache` | Shared artifact cache |
 
-### LLVM Target Support
-This layer extends meta-clang to build LLVM with all Zig-required targets:
-
-**Standard**: AArch64, ARM, X86, PowerPC, RISCV, Mips  
-**Extended**: AMDGPU, AVR, BPF, Hexagon, Lanai, MSP430, NVPTX, Sparc, SystemZ, VE, WebAssembly, XCore, LoongArch, SPIRV
-
-## Building Zig Projects
-
-### Basic Recipe Template
+The existing `B` default and layer `ZIGVERSION`/version variables are also
+retained. Recipes continue to inherit `zig`, set their source and license,
+and optionally customize these variables. For example:
 
 ```bitbake
-SUMMARY = "My Zig application"
-LICENSE = "MIT"
-LIC_FILES_CHKSUM = "file://LICENSE;md5=..."
-
-SRC_URI = "https://github.com/user/project.git;protocol=https;branch=main"
-SRCREV = "..."
-
 inherit zig
-
-# Optional: customize build
 ZIG_BUILD_MODE = "ReleaseFast"
-ZIG_BUILD_ARGS = "-Denable-feature=true"
+ZIG_MCPU = "cortex_a9+neon"
 ```
 
-### Zig Class Variables
+For ARM with `TARGET_OS = "linux-gnueabi"`, `callconvention-hard` in
+`TUNE_FEATURES` selects `arm-linux-gnueabihf`; soft-float still selects
+`gnueabi`. The glibc version comes from the existing class logic, including
+`GLIBCVERSION` fallback and wildcard stripping. Cortex-A9/NEON CPU selection
+via `ZIG_MCPU` is unchanged; the class does not invent or override the tune.
+The Pluto/BSP recipe remains responsible for its CPU setting.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ZIG_BUILD_MODE` | `ReleaseSafe` | Optimization mode: `Debug`, `ReleaseSafe`, `ReleaseFast`, `ReleaseSmall` |
-| `ZIG_TARGET` | Auto-detected | Cross-compilation target (e.g., `aarch64-linux-gnu.2.31`) |
-| `ZIG_BUILD_ARGS` | Empty | Additional arguments to `zig build` |
-| `ZIG_CACHE_DIR` | `${WORKDIR}/.zig-cache` | Per-recipe cache directory |
-| `ZIG_GLOBAL_CACHE_DIR` | `${TMPDIR}/zig-cache` | Global cache for artifacts |
+The class now inherits `pkgconfig`, obtaining `pkgconf-native` and OE's
+exported target-sysroot environment instead of hardcoding pkg-config paths
+without a provider dependency. The configure/compile/install hooks, native
+Zig staging dependency and cross-build arguments remain intact.
 
-### Advanced Build Configuration
+## Static validation gate
 
-```bitbake
-# Custom build.zig arguments
-ZIG_BUILD_ARGS = " \
-    -Dtarget-cpu=cortex-a53 \
-    -Denable-lto=true \
-    -Duse-system-libs=false \
-"
+Run the focused tests without any Yocto setup or commands:
 
-# Override target for specific architecture
-ZIG_TARGET = "aarch64-linux-musl"
-
-# Custom cache locations
-ZIG_CACHE_DIR = "${WORKDIR}/my-cache"
-ZIG_GLOBAL_CACHE_DIR = "${TMPDIR}/shared-zig-cache"
+```sh
+LLVM21_ARCHIVE=/path/to/llvm-project-21.1.8.src.tar.xz \
+ZIG_SOURCE_GIT=/path/to/cached/codeberg.org.ziglang.zig.git \
+python3 tests/test_wrynose_static.py
+git diff --check
+zig fmt --check recipes-examples/hello-zig/files/*.zig
 ```
 
-## Project Structure Requirements
+The source repository is read-only; the tests use the pinned revision, not
+its current HEAD. Generated fixtures live in disposable directories inside
+this worktree. The full gate needs both source inputs: without them the
+source/CMake tests are explicitly skipped, not counted as qualification.
 
-### Minimal Project
-```
-my-zig-project/
-├── build.zig          # Zig build script
-├── src/
-│   └── main.zig       # Main source file
-└── LICENSE
-```
+Checks cover recipe discovery, class/path/provider boundaries, preservation
+of the public class interface and ARM mapping, the release checksum and all
+three LLVM-project license checksums plus Zig's license checksum, zero-fuzz
+and zero-offset patch application, and synthetic CMake discovery with mock
+static libraries. CMake tests prove private-path selection and rejection of
+LLVM22, missing ARM support, missing llvm-config, and missing private
+Clang/LLD libraries even when an ordinary prefix supplies matching names.
+These fixtures **do not compile or link LLVM or Zig**.
 
-### Example build.zig
-```zig
-const std = @import("std");
+## Qualification still required
 
-pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
-
-    const exe = b.addExecutable(.{
-        .name = "my-app",
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
-    });
-
-    b.installArtifact(exe);
-}
-```
-
-## Cross-Compilation
-
-### Automatic Target Detection
-The layer automatically maps OE architecture variables to Zig targets:
-
-| OE Architecture | Zig Target |
-|----------------|------------|
-| `x86_64` | `x86_64-linux-gnu.2.31` |
-| `aarch64` | `aarch64-linux-gnu.2.31` |
-| `arm` | `arm-linux-gnueabihf.2.31` |
-| `mips64` | `mips64-linux-gnu.2.31` |
-| `riscv64` | `riscv64-linux-gnu.2.31` |
-
-### Manual Target Override
-```bitbake
-# Force specific target
-ZIG_TARGET = "aarch64-linux-musl"
-
-# Target with specific CPU
-ZIG_BUILD_ARGS = "-Dcpu=cortex_a72"
-```
-
-## Performance Optimization
-
-### Build Performance
-```bash
-# In local.conf - adjust based on system resources
-PARALLEL_MAKE = "-j 8"
-
-# Zig-specific optimizations
-ZIG_GLOBAL_CACHE_DIR = "/tmp/zig-cache"  # Use fast storage
-```
-
-### Memory Management
-```bash
-# For systems with limited RAM
-PARALLEL_MAKE = "-j 2"
-
-# Monitor memory usage during builds
-bitbake -v zig-native 2>&1 | grep -E "(memory|RAM|swap)"
-```
-
-## Testing and Validation
-
-### Build Test Suite
-```bash
-# Test native compiler
-bitbake zig-native
-
-# Test example application
-bitbake hello-zig
-
-# Test cross-compilation (if applicable)
-MACHINE=raspberrypi4-64 bitbake hello-zig
-
-# Test on target
-runqemu core-image-minimal
-```
-
-### Validation Commands
-```bash
-# Verify Zig installation
-oe-run-native zig-native zig version
-
-# Check supported targets
-oe-run-native zig-native zig targets
-
-# Test compilation
-oe-run-native zig-native zig run hello.zig
-```
-
-## Version Information
-
-- **Zig Version**: 0.15.1
-- **LLVM Version**: 20.1.1 (from meta-clang)
-- **Minimum Yocto**: Scarthgap (5.0)
-- **Layer Version**: Compatible with LAYERSERIES_COMPAT
-
-## Advanced Usage
-
-### Custom Zig Recipes
-
-```bitbake
-# Recipe with external dependencies
-SUMMARY = "Zig project with C library"
-DEPENDS += "openssl zlib"
-
-inherit zig
-
-# Pass library paths to Zig
-ZIG_BUILD_ARGS = " \
-    -Dsystem-ssl=${STAGING_DIR_TARGET}${includedir} \
-    -Dsystem-zlib=${STAGING_DIR_TARGET}${libdir} \
-"
-```
-
-### Integration with Yocto SDK
-
-```bash
-# Generate SDK with Zig support
-bitbake -c populate_sdk core-image-minimal
-
-# In SDK environment
-source environment-setup-*
-zig build -Dtarget=$ZIG_TARGET
-```
+No Yocto, BitBake, devtool, setup sourcing or other Yocto tooling was run for
+this migration. Actual parsing/signatures, LLVM21 and pinned Zig compilation,
+static linking, sysroot population/coexistence, sstate relocation, SPDX3
+output, `hello-zig` cross-compilation and Pluto execution remain unverified.
+The all-backend monolithic build can require substantial RAM and disk.
+Product, BSP, manifest and deployment migration/qualification are separate
+coordinator-owned work. No SDK support or hardware behavior is claimed here.
 
 ## License
 
-MIT License - See LICENSE file for details.
+Layer metadata: MIT (see `LICENSE`). LLVM-project and Zig sources retain the
+licenses and checksums specified by their recipes.
